@@ -74,7 +74,7 @@ th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;whit
 th:first-child,td:first-child{text-align:left}
 th{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 td.sel,th.sel{background:var(--gold-soft);color:var(--ink);font-weight:700}
-.chart{position:relative;height:320px}
+.chart{position:relative;height:400px}
 .foot{color:var(--muted);font-size:13px;line-height:1.6}
 .flag{background:var(--gold-soft);border-radius:10px;padding:10px 14px;color:var(--ink);font-size:14px}
 @media (max-width:1100px){.kpis{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
@@ -181,9 +181,11 @@ function baseOpts(){Chart.defaults.font.family=css("--body");Chart.defaults.colo
   if(window.ChartDataLabels&&!baseOpts.reg){Chart.register(ChartDataLabels);baseOpts.reg=1}
   Chart.defaults.layout.padding={top:24};
   Chart.defaults.scales.linear.ticks.display=false; Chart.defaults.scales.linear.border={display:false};
-  if(Chart.defaults.plugins.datalabels)Object.assign(Chart.defaults.plugins.datalabels,{display:"auto",clamp:true,font:{weight:700,size:11},color:css("--ink")})}
+  if(Chart.defaults.plugins.datalabels)Object.assign(Chart.defaults.plugins.datalabels,{display:"auto",clamp:true,font:{weight:700,size:14},color:css("--ink")})}
 // rótulos de dados
 const brlS=x=>{if(!x)return null;const a=Math.abs(x);return a>=1e6?"R$"+(x/1e6).toLocaleString("pt-BR",{maximumFractionDigits:1})+"M":a>=1e3?"R$"+(x/1e3).toLocaleString("pt-BR",{maximumFractionDigits:1})+"K":"R$"+Math.round(x)};
+// separa barras (metade de baixo) e linha (metade de cima) para os rótulos não se sobreporem
+const band=(bars,line)=>{const bm=Math.max(...bars,1),lm=Math.max(...line,1),ln=Math.min(...line);const sp=Math.max(lm-ln,lm*0.2);return{ymax:bm*2.15,y1min:ln-sp*1.6,y1max:lm+sp*0.4}};
 const LBAR=f=>({anchor:"end",align:"end",offset:2,formatter:v=>v?f(v):null});
 const LLINE=(f,col)=>({align:"top",offset:6,backgroundColor:css("--card"),borderColor:col,borderWidth:1,borderRadius:4,padding:{top:2,bottom:2,left:5,right:5},formatter:v=>v?f(v):null});
 
@@ -231,12 +233,13 @@ function renderAnual(){
   // Evolução mensal do ano selecionado
   const em=selY===LAST_Y?range(LAST_M):range(12);
   document.getElementById("evoSub").textContent=`${selY} · Valor vendido (barras) e atendimentos (linha)`;
+  const EV=band(em.map(m=>D[selY][m].val),em.map(m=>D[selY][m].a));
   mk("evoChart",{data:{labels:em.map(m=>MES3[m-1]),datasets:[
     {type:"bar",label:"Valor vendido",data:em.map(m=>D[selY][m].val),backgroundColor:em.map(m=>m===selM?css("--gold"):css("--s4")),borderRadius:6,yAxisID:"y",order:2,datalabels:LBAR(brlS)},
     {type:"line",label:"Atendimentos",data:em.map(m=>D[selY][m].a),borderColor:css("--gold"),backgroundColor:css("--gold"),tension:.3,pointRadius:4,yAxisID:"y1",order:1,datalabels:{...LLINE(v=>nf.format(v),css("--gold")),display:true}}]},
     options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},
       plugins:{tooltip:{callbacks:{label:c=>c.dataset.yAxisID==="y"?` Valor: ${brl(c.raw)} · ${D[selY][em[c.dataIndex]].v} venda(s)`:` Atendimentos: ${nf.format(c.raw)}`}}},
-      scales:{y:{grace:"12%",ticks:{callback:v=>brl(v)},grid:{color:css("--grid")}},y1:{position:"right",beginAtZero:true,grace:"15%",grid:{display:false},ticks:{callback:v=>nf.format(v)}},x:{grid:{display:false}}}}});
+      scales:{y:{min:0,max:EV.ymax,ticks:{callback:v=>brl(v)},grid:{color:css("--grid")}},y1:{position:"right",min:EV.y1min,max:EV.y1max,grid:{display:false},ticks:{callback:v=>nf.format(v)}},x:{grid:{display:false}}}}});
 }
 
 /* ---------- Visão Semestral (mês a mês) ---------- */
@@ -251,9 +254,9 @@ function renderSem(){
   document.getElementById("semTitle").textContent=`${l} — Janeiro a ${MESES[LAST_M-1]}`;
   document.getElementById("semNote").textContent=`${LAST_Y} com dados até ${MESES[LAST_M-1]}`;
   const cols=[css("--s1"),css("--s2"),css("--s3"),css("--s4")];
-  mk("semChart",{type:"line",data:{labels:months.map(m=>MES3[m-1]),datasets:YEARS.map((y,i)=>({label:String(y),data:months.map(m=>D[y][m][k]),borderColor:cols[i],backgroundColor:cols[i],borderWidth:y===LAST_Y?3.5:2,pointRadius:y===LAST_Y?5:3,tension:.3,datalabels:LLINE(lf,cols[i])}))},
+  mk("semChart",{type:"line",data:{labels:months.map(m=>MES3[m-1]),datasets:YEARS.map((y,i)=>({label:String(y),data:months.map(m=>D[y][m][k]),borderColor:cols[i],backgroundColor:cols[i],borderWidth:y===LAST_Y?3.5:2,pointRadius:y===LAST_Y?5:3,tension:.3,datalabels:{...LLINE(lf,cols[i]),display:y===LAST_Y?true:"auto"}}))},
     options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${f(c.raw)}`}}},
-      scales:{y:{beginAtZero:true,grace:"12%",ticks:{callback:v=>f(v)}},x:{grid:{display:false}}}}});
+      scales:{y:{beginAtZero:true,grace:"12%",ticks:{callback:v=>f(v)}},x:{offset:true,grid:{display:false}}}}});
   document.getElementById("semTblSub").textContent=`${l} por mês · total do período Jan–${MES3[LAST_M-1]} e variação ${LAST_Y} vs. ${LAST_Y-1}`;
   const tot=y=>months.reduce((s,m)=>s+D[y][m][k],0);
   document.getElementById("semTbl").innerHTML=`<thead><tr><th>Mês</th>${YEARS.map(y=>`<th class="${y===LAST_Y?"sel":""}">${y}</th>`).join("")}<th>Var. ${String(LAST_Y).slice(2)}/${String(LAST_Y-1).slice(2)}</th></tr></thead><tbody>`+
@@ -272,12 +275,13 @@ function renderCom(){
   const lbl=r=>r.partial?`${r.y}*`:String(r.y);
   const sub=per==="comp"?`Janeiro–${MESES[LAST_M-1]} de cada ano`:`Ano completo · *${LAST_Y} até ${MESES[LAST_M-1]}`;
   document.getElementById("comSub").textContent=sub; document.getElementById("comTblSub").textContent=sub;
+  const CB=band(rows.map(r=>r.c),rows.map(r=>r.val));
   mk("comChart",{data:{labels:rows.map(lbl),datasets:[
     {type:"bar",label:"Comandas totais",data:rows.map(r=>r.c),backgroundColor:css("--s1"),borderRadius:6,yAxisID:"y",order:3,datalabels:LBAR(v=>nf.format(v))},
     {type:"bar",label:"Comandas novas",data:rows.map(r=>Math.round(r.nov)),backgroundColor:css("--s4"),borderRadius:6,yAxisID:"y",order:2,datalabels:LBAR(v=>nf.format(v))},
-    {type:"line",label:"Faturamento",data:rows.map(r=>r.val),borderColor:css("--gold"),backgroundColor:css("--gold"),pointRadius:5,borderWidth:3,yAxisID:"y1",order:1,datalabels:{...LLINE(brlS,css("--gold")),display:true,align:"right",offset:8}}]},
+    {type:"line",label:"Faturamento",data:rows.map(r=>r.val),borderColor:css("--gold"),backgroundColor:css("--gold"),pointRadius:5,borderWidth:3,yAxisID:"y1",order:1,datalabels:{...LLINE(brlS,css("--gold")),display:true}}]},
     options:{maintainAspectRatio:false,interaction:{mode:"index",intersect:false},plugins:{tooltip:{callbacks:{label:c=>c.dataset.yAxisID==="y1"?` Faturamento: ${brl(c.raw)}`:` ${c.dataset.label}: ${nf.format(c.raw)}`}}},
-      scales:{y:{beginAtZero:true,grace:"12%",ticks:{callback:v=>nf.format(v)}},y1:{position:"right",beginAtZero:true,grace:"15%",grid:{display:false},ticks:{callback:v=>brl(v)}},x:{grid:{display:false}}}}});
+      scales:{y:{min:0,max:CB.ymax,ticks:{callback:v=>nf.format(v)}},y1:{position:"right",min:CB.y1min,max:CB.y1max,grid:{display:false},ticks:{callback:v=>brl(v)}},x:{grid:{display:false}}}}});
   mk("effChart",{type:"bar",data:{labels:rows.map(lbl),datasets:[
     {label:"÷ comanda total",data:rows.map(r=>r.fpc),backgroundColor:css("--s2"),borderRadius:6,datalabels:LBAR(brlS)},
     {label:"÷ comanda nova",data:rows.map(r=>r.fpn),backgroundColor:css("--gold"),borderRadius:6,datalabels:LBAR(brlS)}]},
