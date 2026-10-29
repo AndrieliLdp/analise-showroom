@@ -11,6 +11,11 @@
   b.type="button"; b.id="pdfBtn"; b.className="pdfbtn"; b.setAttribute("data-html2canvas-ignore","");
   var LABEL='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Baixar PDF';
   b.innerHTML=LABEL; hero.appendChild(b);
+  /* html2canvas não entende cores modernas (color-mix, color(), oklch...). Converte para rgba na cópia usada no PDF. */
+  function toRgba(c){var x=document.createElement("canvas");x.width=x.height=1;var g=x.getContext("2d");g.fillStyle="#000";g.fillStyle=c;g.fillRect(0,0,1,1);var d=g.getImageData(0,0,1,1).data;return "rgba("+d[0]+","+d[1]+","+d[2]+","+(d[3]/255).toFixed(3)+")"}
+  function fixColors(doc){var W=doc.defaultView,P=["color","backgroundColor","borderTopColor","borderRightColor","borderBottomColor","borderLeftColor","outlineColor","textDecorationColor","columnRuleColor"];
+    doc.querySelectorAll("*").forEach(function(el){var cs=W.getComputedStyle(el);P.forEach(function(p){var v=cs[p];if(v&&/color\(|color-mix|okl|lab\(|lch\(/.test(v))el.style.setProperty(p.replace(/[A-Z]/g,function(m){return "-"+m.toLowerCase()}),toRgba(v),"important")});
+      ["boxShadow","backgroundImage"].forEach(function(p){var v=cs[p];if(v&&/color\(|color-mix|okl|lab\(|lch\(/.test(v))el.style.setProperty(p==="boxShadow"?"box-shadow":"background-image","none","important")})})}
   b.addEventListener("click", async function(){
     if(!window.html2canvas||!window.jspdf){alert("Não foi possível carregar o gerador de PDF. Verifique a internet e tente de novo.");return}
     b.disabled=true; b.textContent="Gerando PDF…";
@@ -18,7 +23,7 @@
       var aba=document.querySelector('.tab[aria-selected="true"] strong');
       var nome=(aba?aba.textContent:"Dashboard").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_|_$/g,"");
       var el=document.querySelector(".wrap");
-      var canvas=await html2canvas(el,{scale:2,backgroundColor:getComputedStyle(document.body).backgroundColor,useCORS:true,logging:false});
+      var canvas=await html2canvas(el,{scale:2,backgroundColor:getComputedStyle(document.body).backgroundColor,useCORS:true,logging:false,onclone:fixColors});
       var w=canvas.width/2, h=canvas.height/2;
       var pdf=new window.jspdf.jsPDF({orientation:w>h?"landscape":"portrait",unit:"px",format:[w,h],hotfixes:["px_scaling"],compress:true});
       pdf.addImage(canvas.toDataURL("image/jpeg",0.92),"JPEG",0,0,w,h);
